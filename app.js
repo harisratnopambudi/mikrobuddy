@@ -633,7 +633,7 @@ Aturan Khusus:
             }
 
             const apiKeyVal = localStorage.getItem('nine_router_api_key') || '';
-            const workerUrl = localStorage.getItem('nine_router_worker_url') || '';
+            const workerUrl = localStorage.getItem('nine_router_worker_url') || 'https://mikro-buddy.harisratnopambudi.workers.dev';
             const modelsToTry = [modelName, 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-2.5-flash'];
             const uniqueModels = [...new Set(modelsToTry)];
             let lastError = null;
