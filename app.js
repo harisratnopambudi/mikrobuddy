@@ -355,12 +355,92 @@ document.addEventListener('DOMContentLoaded', () => {
         contentEl.className = 'message-content';
         contentEl.innerHTML = content;
 
+        // Add interactive execution button to MikroTik script code blocks
+        if (sender === 'assistant') {
+            const codeBlocks = contentEl.querySelectorAll('pre');
+            codeBlocks.forEach(pre => {
+                const code = pre.querySelector('code');
+                const codeText = code ? code.textContent.trim() : '';
+                
+                // Detect if it looks like RouterOS commands (starts with slash or has common commands)
+                const isRouterOS = codeText.startsWith('/') || codeText.includes('/ip') || codeText.includes('/interface') || codeText.includes('/queue') || codeText.includes('/system');
+                
+                if (isRouterOS) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block-wrapper';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'code-block-header';
+                    
+                    const lang = document.createElement('span');
+                    lang.className = 'code-lang';
+                    lang.textContent = 'RouterOS Script';
+                    
+                    const runBtn = document.createElement('button');
+                    runBtn.className = 'btn-run-script';
+                    runBtn.innerHTML = '<i data-lucide="play" style="width:12px; height:12px;"></i> Jalankan';
+                    
+                    // Action when script execution is requested
+                    runBtn.addEventListener('click', async () => {
+                        if (!connectedRouter) {
+                            alert('Mohon hubungkan router MikroTik terlebih dahulu!');
+                            return;
+                        }
+                        if (runBtn.classList.contains('running') || runBtn.classList.contains('success')) return;
+
+                        runBtn.classList.add('running');
+                        runBtn.innerHTML = '<i class="spinner-small"></i> Menjalankan...';
+
+                        try {
+                            const res = await fetch(getWorkerEndpoint('/api/run-script'), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    target: connectedRouter.port ? `${connectedRouter.ip}:${connectedRouter.port}` : connectedRouter.ip,
+                                    username: connectedRouter.user,
+                                    password: connectedRouter.pass,
+                                    script: codeText
+                                })
+                            });
+                            
+                            const data = await res.json();
+                            if (res.ok && data.success) {
+                                runBtn.className = 'btn-run-script success';
+                                runBtn.innerHTML = '<i data-lucide="check-circle" style="width:12px; height:12px;"></i> Berhasil!';
+                                appendSystemNotification(`✅ Script berhasil dijalankan ke router ${connectedRouter.name}.`);
+                            } else {
+                                throw new Error(data.error || 'Eksekusi gagal');
+                            }
+                        } catch (err) {
+                            runBtn.className = 'btn-run-script failed';
+                            runBtn.innerHTML = '<i data-lucide="x-circle" style="width:12px; height:12px;"></i> Gagal';
+                            alert(`Gagal menjalankan script: ${err.message}`);
+                        }
+                        lucide.createIcons();
+                    });
+                    
+                    header.appendChild(lang);
+                    header.appendChild(runBtn);
+                    
+                    // Re-structure DOM
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(header);
+                    wrapper.appendChild(pre);
+                }
+            });
+        }
+
         bubble.appendChild(avatar);
         bubble.appendChild(contentEl);
         chatMessages.appendChild(bubble);
 
         // Scroll to bottom
-        document.querySelector('.chat-viewport').scrollTop = document.querySelector('.chat-viewport').scrollHeight;
+        const chatViewport = document.querySelector('.chat-viewport');
+        if (chatViewport) {
+            chatViewport.scrollTop = chatViewport.scrollHeight;
+        }
+        
+        lucide.createIcons();
         return bubble;
     };
 
@@ -587,16 +667,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     routerContext += `- Uptime: ${resource.uptime || ''}\n\n`;
                 }
 
-                // Fetch active hotspot users if related to user queries
-                if (lowerQuery.includes('user') || lowerQuery.includes('aktif') || lowerQuery.includes('online') || lowerQuery.includes('pelanggan')) {
-                    const activeUsers = await callRouterAPI('/ip/hotspot/active');
-                    if (Array.isArray(activeUsers)) {
-                        routerContext += `Live Active Hotspot Users:\n${JSON.stringify(activeUsers, null, 2)}\n\n`;
-                    }
-                    const leases = await callRouterAPI('/ip/dhcp-server/lease');
-                    if (Array.isArray(leases)) {
-                        routerContext += `Live DHCP Leases:\n${JSON.stringify(leases.filter(l => l.status === 'bound'), null, 2)}\n\n`;
-                    }
+                // Fetch active hotspot users & profiles if related to user/profile queries
+                if (lowerQuery.includes('user') || lowerQuery.includes('aktif') || lowerQuery.includes('online') || lowerQuery.includes('pelanggan') || lowerQuery.includes('profil') || lowerQuery.includes('profile')) {
+                    try {
+                        const activeUsers = await callRouterAPI('/ip/hotspot/active');
+                        if (Array.isArray(activeUsers)) {
+                            routerContext += `Live Active Hotspot Users:\n${JSON.stringify(activeUsers, null, 2)}\n\n`;
+                        }
+                    } catch (e) {}
+                    try {
+                        const leases = await callRouterAPI('/ip/dhcp-server/lease');
+                        if (Array.isArray(leases)) {
+                            routerContext += `Live DHCP Leases:\n${JSON.stringify(leases.filter(l => l.status === 'bound'), null, 2)}\n\n`;
+                        }
+                    } catch (e) {}
+                    try {
+                        const profiles = await callRouterAPI('/ip/hotspot/user/profile');
+                        if (Array.isArray(profiles)) {
+                            routerContext += `Live Hotspot User Profiles Available:\n${JSON.stringify(profiles.map(p => ({
+                                name: p.name,
+                                'shared-users': p['shared-users'],
+                                'rate-limit': p['rate-limit'] || 'unlimited'
+                            })), null, 2)}\n\n`;
+                        }
+                    } catch (e) {}
+                    try {
+                        const users = await callRouterAPI('/ip/hotspot/user');
+                        if (Array.isArray(users)) {
+                            routerContext += `Live Hotspot Users List:\n${JSON.stringify(users.map(u => ({
+                                name: u.name,
+                                profile: u.profile,
+                                comment: u.comment || ''
+                            })), null, 2)}\n\n`;
+                        }
+                    } catch (e) {}
                 }
 
                 // Fetch Interfaces for network status queries
