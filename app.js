@@ -774,7 +774,7 @@ Aturan Khusus:
     const initGoogleLogin = () => {
         if (typeof google !== 'undefined') {
             google.accounts.id.initialize({
-                client_id: '921102919420-55g1o7g67d8f99e4f1a238f906f0e34a.apps.googleusercontent.com', // Demo Client ID
+                client_id: '635273386003-ovajvn6p2kcrc41cdar9ste0i7tpch6u.apps.googleusercontent.com', // User Client ID
                 callback: handleCredentialResponse
             });
             google.accounts.id.renderButton(
