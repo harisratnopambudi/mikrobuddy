@@ -73,6 +73,27 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (activeRouterIndicator) {
             activeRouterIndicator.classList.add('hidden');
         }
+
+        // Prefill or clear the router form fields
+        const nameInput = document.getElementById('router-name');
+        const ipInput = document.getElementById('router-ip');
+        const portInput = document.getElementById('router-port');
+        const userInput = document.getElementById('router-user');
+        const passInput = document.getElementById('router-pass');
+        
+        if (connectedRouter) {
+            if (nameInput) nameInput.value = connectedRouter.name || '';
+            if (ipInput) ipInput.value = connectedRouter.ip || '';
+            if (portInput) portInput.value = connectedRouter.port || '';
+            if (userInput) userInput.value = connectedRouter.user || '';
+            if (passInput) passInput.value = connectedRouter.pass || '';
+        } else {
+            if (nameInput) nameInput.value = '';
+            if (ipInput) ipInput.value = '';
+            if (portInput) portInput.value = '8728'; // default standard RouterOS API port
+            if (userInput) userInput.value = '';
+            if (passInput) passInput.value = '';
+        }
         
         renderHistory();
     };
