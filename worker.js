@@ -160,16 +160,30 @@ async function executeRouterOSCommand(host, port, username, password, command, a
       buffer = buffer.subarray(offset);
     }
   } catch (err) {
-    commandError = err;
+    // If the stream is cancelled but we already finished receiving the response, ignore the error
+    if (!(finished && (err.message?.includes('cancelled') || err.message?.includes('cancel')))) {
+      commandError = err;
+    }
   } finally {
     try {
       reader.releaseLock();
+    } catch (e) {}
+    try {
       writer.releaseLock();
+    } catch (e) {}
+    try {
       await socket.close();
     } catch (e) {}
   }
 
-  if (commandError) throw commandError;
+  if (commandError) {
+    // Only throw if we don't have any results, otherwise warning is preferred over crash
+    if (sentences.length === 0) {
+      throw commandError;
+    } else {
+      console.warn('Socket closed with error after receiving data:', commandError.message);
+    }
+  }
   return sentences;
 }
 
@@ -295,6 +309,167 @@ export default {
       }
     }
 
+// Helper to parse a single RouterOS CLI command line (e.g. "/ip hotspot user add name=HARIS password=123")
+// into RouterOS API format: command = "/ip/hotspot/user/add", args = {name: "HARIS", password: "123"}
+function parseRouterOSCLI(cliLine) {
+  const line = cliLine.trim();
+  if (!line) return null;
+
+  // Split command path from arguments
+  // e.g. "/ip hotspot user add" vs "name=HARIS password=123"
+  const words = [];
+  let currentWord = '';
+  let inQuotes = false;
+  let quoteChar = '';
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if ((char === '"' || char === "'") && (i === 0 || line[i-1] !== '\\')) {
+      if (inQuotes && char === quoteChar) {
+        inQuotes = false;
+      } else if (!inQuotes) {
+        inQuotes = true;
+        quoteChar = char;
+      }
+      currentWord += char;
+    } else if (char === ' ' && !inQuotes) {
+      if (currentWord) {
+        words.push(currentWord);
+        currentWord = '';
+      }
+    } else {
+      currentWord += char;
+    }
+  }
+  if (currentWord) words.push(currentWord);
+
+  if (words.length === 0) return null;
+
+  // Reconstruct command path
+  // Find where arguments start (containing '=')
+  const cmdParts = [];
+  const argParts = [];
+
+  for (const word of words) {
+    if (word.includes('=') && !word.startsWith('/')) {
+      argParts.push(word);
+    } else {
+      if (argParts.length > 0) {
+        // Words after args started must also be args or malformed, treat as arg parts
+        argParts.push(word);
+      } else {
+        cmdParts.push(word);
+      }
+    }
+  }
+
+  // Format command path: /ip hotspot user add -> /ip/hotspot/user/add
+  let command = cmdParts.join('/')
+    .replace(/\/+/g, '/')
+    .replace(/^\/?/, '/'); // Ensure leading slash
+
+  // Parse arguments
+  const args = {};
+  for (const arg of argParts) {
+    const eqIdx = arg.indexOf('=');
+    if (eqIdx !== -1) {
+      const rawKey = arg.substring(0, eqIdx).trim();
+      let rawVal = arg.substring(eqIdx + 1).trim();
+      
+      // Strip quotes
+      if ((rawVal.startsWith('"') && rawVal.endsWith('"')) || (rawVal.startsWith("'") && rawVal.endsWith("'"))) {
+        rawVal = rawVal.substring(1, rawVal.length - 1);
+      }
+      // Replace escaped quotes
+      rawVal = rawVal.replace(/\\"/g, '"').replace(/\\'/g, "'");
+      
+      if (rawKey) {
+        args[rawKey] = rawVal;
+      }
+    }
+  }
+
+  return { command, args };
+}
+
+    // 3.5 Run Script Endpoint (POST)
+    if (url.pathname === "/api/run-script" && request.method === "POST") {
+      try {
+        const payload = await request.json();
+        const targetUrl = payload.target;
+        const username = payload.username;
+        const password = payload.password;
+        const script = payload.script || '';
+
+        if (!targetUrl || !script) {
+          return new Response(JSON.stringify({ error: "Missing target or script" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        // Split script into lines and clean them
+        const lines = script.split('\n')
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#') && !l.startsWith('//'));
+
+        const results = [];
+        let host = targetUrl;
+        let port = 8728;
+        if (targetUrl.includes(':')) {
+          const parts = targetUrl.split(':');
+          host = parts[0];
+          port = parseInt(parts[1]);
+        }
+
+        let currentContext = ''; // Tracks command submenu context (e.g. "/ip hotspot user")
+
+        for (const line of lines) {
+          let targetLine = line;
+          
+          if (line.startsWith('/')) {
+            // Check if this is a path command line
+            const parsed = parseRouterOSCLI(line);
+            if (parsed) {
+              // If it's a submenu navigation line (does not end with add/set/remove/print etc.)
+              const isAction = parsed.command.match(/\/(print|add|set|remove|disable|enable|move|export|getall)$/);
+              if (!isAction) {
+                currentContext = parsed.command;
+                // Don't send navigation-only commands to API (API doesn't have interactive cd navigation)
+                continue; 
+              } else {
+                // If it starts with / but is an action, run it and reset context
+                currentContext = '';
+              }
+            }
+          } else if (currentContext) {
+            // If it doesn't start with / but we have a context path, prepend it
+            targetLine = `${currentContext} ${line}`;
+          }
+
+          const parsed = parseRouterOSCLI(targetLine);
+          if (parsed) {
+            try {
+              const res = await executeRouterOSCommand(host, port, username, password, parsed.command, parsed.args);
+              results.push({ line: targetLine, success: true, response: res });
+            } catch (lineErr) {
+              results.push({ line: targetLine, success: false, error: lineErr.message });
+            }
+          }
+        }
+
+        return new Response(JSON.stringify({ success: true, results }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "Failed to execute script", details: err.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    }
+
     // 4. Serverless RouterOS TCP & REST Proxy (POST)
     if (url.pathname === "/api/proxy" && request.method === "POST") {
       try {
@@ -313,12 +488,21 @@ export default {
           });
         }
 
-        const isRest = targetUrl.startsWith('http') || targetUrl.includes(':80') || targetUrl.includes(':443');
+        // Parse host and port from target
+        const cleanTarget = targetUrl.replace(/^http(s)?:\/\//, '');
+        const hostPortParts = cleanTarget.split(':');
+        const host = hostPortParts[0];
+        const port = hostPortParts[1] ? parseInt(hostPortParts[1]) : 8728;
+
+        // Determine if REST API or RouterOS TCP API based on port
+        // REST API uses ports 80, 443 or when target starts with http/https
+        // RouterOS API uses ports like 8728, 8729, 1206, etc.
+        const restPorts = [80, 443];
+        const isRest = targetUrl.startsWith('http') || restPorts.includes(port);
 
         if (isRest) {
-          const cleanTarget = targetUrl.replace(/\/$/, '');
           const cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-          const fullUrl = cleanTarget.startsWith('http') ? `${cleanTarget}${cleanEndpoint}` : `https://${cleanTarget}${cleanEndpoint}`;
+          const fullUrl = targetUrl.startsWith('http') ? `${targetUrl.replace(/\/$/, '')}${cleanEndpoint}` : `https://${cleanTarget}${cleanEndpoint}`;
           
           const headers = {
             'Accept': 'application/json',
@@ -340,16 +524,79 @@ export default {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         } else {
-          // Parse Host and Port
-          let host = targetUrl;
-          let port = 8728;
-          if (targetUrl.includes(':')) {
-            const parts = targetUrl.split(':');
-            host = parts[0];
-            port = parseInt(parts[1]);
+          // RouterOS TCP API - Map REST endpoints to RouterOS API commands
+          let command = '';
+          let args = postData || {};
+
+          if (endpoint.includes('/system/resource')) {
+            command = '/system/resource/print';
+            args = {};
+          } else if (endpoint.includes('/ip/hotspot/active')) {
+            command = '/ip/hotspot/active/print';
+            args = {};
+          } else if (endpoint.includes('/ip/dhcp-server/lease')) {
+            command = '/ip/dhcp-server/lease/print';
+            args = {};
+          } else if (endpoint.includes('/interface')) {
+            command = '/interface/print';
+            args = {};
+          } else if (endpoint.includes('/ip/dns')) {
+            if (method === 'PATCH' || method === 'POST') {
+              command = '/ip/dns/set';
+              args = {};
+              if (postData && postData.servers) args['servers'] = postData.servers;
+              if (postData && postData['allow-remote-requests']) args['allow-remote-requests'] = postData['allow-remote-requests'];
+            } else {
+              command = '/ip/dns/print';
+              args = {};
+            }
+          } else if (endpoint.includes('/ip/firewall/mangle')) {
+            if (method === 'POST') {
+              command = '/ip/firewall/mangle/add';
+            } else {
+              command = '/ip/firewall/mangle/print';
+              args = {};
+            }
+          } else if (endpoint.includes('/system/identity')) {
+            command = '/system/identity/print';
+            args = {};
+          } else if (endpoint.includes('/ip/address')) {
+            command = '/ip/address/print';
+            args = {};
+          } else if (endpoint.includes('/ip/route')) {
+            command = '/ip/route/print';
+            args = {};
+          } else if (endpoint.includes('/system/routerboard')) {
+            command = '/system/routerboard/print';
+            args = {};
+          } else if (endpoint.includes('/ip/firewall/filter')) {
+            command = '/ip/firewall/filter/print';
+            args = {};
+          } else if (endpoint.includes('/ip/firewall/nat')) {
+            command = '/ip/firewall/nat/print';
+            args = {};
+          } else if (endpoint.includes('/queue/simple')) {
+            command = '/queue/simple/print';
+            args = {};
+          } else {
+            // Generic fallback: append /print if endpoint doesn't already end with an action
+            const cleanCmd = endpoint.replace(/^\//, '/').replace(/\/$/, '');
+            if (!cleanCmd.match(/\/(print|add|set|remove|disable|enable|move|export|getall)$/)) {
+              command = cleanCmd + '/print';
+            } else {
+              command = cleanCmd;
+            }
           }
 
-          const result = await executeRouterOSCommand(host, port, username, password, endpoint, postData || {});
+          const result = await executeRouterOSCommand(host, port, username, password, command, args);
+          
+          // Format response: single object for resource/dns/identity endpoints, array for others
+          if (endpoint.includes('/system/resource') || endpoint.includes('/ip/dns') || endpoint.includes('/system/identity') || endpoint.includes('/system/routerboard')) {
+            return new Response(JSON.stringify(result[0] || {}), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
           return new Response(JSON.stringify(result), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
