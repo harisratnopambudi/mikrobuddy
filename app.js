@@ -559,11 +559,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Fetch Router Context (if router is connected)
         let routerContext = '';
+        let cachedResource = null;
         if (router) {
             try {
                 // Fetch general resource info
                 const resourceRaw = await callRouterAPI('/system/resource');
                 const resource = Array.isArray(resourceRaw) ? resourceRaw[0] : resourceRaw;
+                cachedResource = resource;
                 if (resource) {
                     routerContext += `Connected Router Info:\n`;
                     routerContext += `- Name: ${router.name}\n`;
@@ -622,35 +624,62 @@ Mode: "${mode.toUpperCase()}" (BIASA=konsultasi, DIAGNOSA=analisis data router, 
 
 ${routerContext ? `DATA REAL-TIME ROUTER:\n${routerContext}` : 'Tidak ada router terhubung.'}
 
-ATURAN WAJIB:
-1. SINGKAT & TO THE POINT. Jangan bertele-tele. Langsung jawab inti pertanyaan.
-2. Format respon dalam HTML (BUKAN markdown). Gunakan komponen visual berikut:
+ATURAN:
+1. SINGKAT & TO THE POINT. Jangan bertele-tele. Langsung jawab inti pertanyaan. Maks 3-5 paragraf.
+2. Format: Markdown biasa. Gunakan **bold**, \`code\`, tabel, list, dan code block (\`\`\`routeros).
+3. Jangan ulangi data router yang sudah ditampilkan di dashboard. Langsung analisis/rekomendasi.
+4. Jika mode DIAGNOSA: analisis singkat + rekomendasi konkret.
+5. Jika mode EKSEKUSI: langsung berikan script, penjelasan minimal.`;
 
-Untuk info router, gunakan metric cards:
+        // Build router info card HTML from live data (programmatic, not from AI)
+        const buildRouterCard = (routerObj, resourceData) => {
+            if (!routerObj || !resourceData) return '';
+            const res = Array.isArray(resourceData) ? resourceData[0] : resourceData;
+            if (!res) return '';
+
+            const boardName = res['board-name'] || res.board || 'MikroTik';
+            const version = res.version || '-';
+            const cpuLoad = parseInt(res['cpu-load'] || '0');
+            const freeMem = res['free-memory'] ? (parseInt(res['free-memory']) / 1024 / 1024).toFixed(0) : '?';
+            const totalMem = res['total-memory'] ? (parseInt(res['total-memory']) / 1024 / 1024).toFixed(0) : '?';
+            const uptime = res.uptime || '-';
+            const arch = res['architecture-name'] || res.architecture || '';
+
+            const cpuClass = cpuLoad < 30 ? 'text-success' : cpuLoad < 70 ? 'text-warning' : 'text-danger';
+            const cpuBarClass = cpuLoad < 30 ? 'progress-low' : cpuLoad < 70 ? 'progress-mid' : 'progress-high';
+            
+            let memPercent = 0;
+            if (totalMem !== '?' && freeMem !== '?') {
+                memPercent = Math.round(((parseInt(totalMem) - parseInt(freeMem)) / parseInt(totalMem)) * 100);
+            }
+            const memBarClass = memPercent < 50 ? 'progress-low' : memPercent < 80 ? 'progress-mid' : 'progress-high';
+
+            return `
 <div class="router-info-card">
-  <div class="card-header"><div class="card-icon">🖧</div><div><div class="card-title">Nama Router</div><div class="card-subtitle">Status</div></div></div>
-  <div class="metric-grid">
-    <div class="metric-card metric-model"><div class="metric-label">Model</div><div class="metric-value">hEX</div></div>
-    <div class="metric-card metric-version"><div class="metric-label">RouterOS</div><div class="metric-value">7.x</div></div>
-    <div class="metric-card metric-cpu"><div class="metric-label">CPU</div><div class="metric-value text-success">5%</div></div>
-    <div class="metric-card metric-memory"><div class="metric-label">Memory</div><div class="metric-value">180 MB</div></div>
-    <div class="metric-card metric-uptime"><div class="metric-label">Uptime</div><div class="metric-value">2d 5h</div></div>
-  </div>
-</div>
-
-Untuk peringatan/tips: <div class="info-box box-warning"><span class="info-icon">⚠️</span><div>Pesan</div></div>
-Variasi: box-info (ℹ️), box-success (✅), box-danger (🚨), box-tip (💡)
-
-Untuk status: <span class="status-badge-inline badge-online"><span class="badge-dot"></span> Online</span>
-Variasi: badge-offline, badge-warning, badge-info
-
-Untuk data tabular gunakan <table> dengan <thead> dan <tbody>.
-Untuk script/kode gunakan <pre><code>...</code></pre>.
-Untuk penekanan gunakan <strong>, <code> inline.
-
-3. CPU rendah (<30%) = text-success, sedang (30-70%) = text-warning, tinggi (>70%) = text-danger.
-4. Jangan ulangi data yang sudah jelas. Langsung analisis/rekomendasi.
-5. Maksimal 3-5 paragraf per jawaban kecuali diminta detail.`;
+    <div class="card-header">
+        <div class="card-icon">🖧</div>
+        <div>
+            <div class="card-title">${routerObj.name}</div>
+            <div class="card-subtitle"><span class="status-badge-inline badge-online"><span class="badge-dot"></span> Online</span> · ${arch}</div>
+        </div>
+    </div>
+    <div class="metric-grid">
+        <div class="metric-card metric-model"><div class="metric-label">Model</div><div class="metric-value">${boardName}</div></div>
+        <div class="metric-card metric-version"><div class="metric-label">RouterOS</div><div class="metric-value">${version}</div></div>
+        <div class="metric-card metric-cpu">
+            <div class="metric-label">CPU Load</div>
+            <div class="metric-value ${cpuClass}">${cpuLoad}%</div>
+            <div class="progress-bar-container"><div class="progress-bar ${cpuBarClass}" style="width:${cpuLoad}%"></div></div>
+        </div>
+        <div class="metric-card metric-memory">
+            <div class="metric-label">Memory</div>
+            <div class="metric-value">${freeMem} MB free</div>
+            <div class="progress-bar-container"><div class="progress-bar ${memBarClass}" style="width:${memPercent}%"></div></div>
+        </div>
+        <div class="metric-card metric-uptime"><div class="metric-label">Uptime</div><div class="metric-value">${uptime}</div></div>
+    </div>
+</div>`;
+        };
 
         // 4. Query the official Gemini API directly
         try {
@@ -726,10 +755,21 @@ Untuk penekanan gunakan <strong>, <code> inline.
             const resData = await response.json();
             if (resData.candidates && resData.candidates[0] && resData.candidates[0].content && resData.candidates[0].content.parts[0]) {
                 let text = resData.candidates[0].content.parts[0].text;
+                let htmlContent = '';
+                
                 if (typeof marked !== 'undefined') {
-                    return marked.parse(text);
+                    htmlContent = marked.parse(text);
+                } else {
+                    htmlContent = `<p>${text.replace(/\n/g, '<br>')}</p>`;
                 }
-                return `<p>${text.replace(/\n/g, '<br>')}</p>`;
+
+                // Prepend router info card for status/connection queries
+                const isStatusQuery = lowerQuery.match(/konek|status|sudah|connect|terhubung|info|router|resource|detail/i);
+                if (router && cachedResource && isStatusQuery) {
+                    htmlContent = buildRouterCard(router, cachedResource) + htmlContent;
+                }
+
+                return htmlContent;
             }
             throw new Error('Respon dari AI kosong atau tidak valid.');
 
