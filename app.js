@@ -641,18 +641,10 @@ ATURAN:
             const version = res.version || '-';
             const cpuLoad = parseInt(res['cpu-load'] || '0');
             const freeMem = res['free-memory'] ? (parseInt(res['free-memory']) / 1024 / 1024).toFixed(0) : '?';
-            const totalMem = res['total-memory'] ? (parseInt(res['total-memory']) / 1024 / 1024).toFixed(0) : '?';
             const uptime = res.uptime || '-';
             const arch = res['architecture-name'] || res.architecture || '';
 
             const cpuClass = cpuLoad < 30 ? 'text-success' : cpuLoad < 70 ? 'text-warning' : 'text-danger';
-            const cpuBarClass = cpuLoad < 30 ? 'progress-low' : cpuLoad < 70 ? 'progress-mid' : 'progress-high';
-            
-            let memPercent = 0;
-            if (totalMem !== '?' && freeMem !== '?') {
-                memPercent = Math.round(((parseInt(totalMem) - parseInt(freeMem)) / parseInt(totalMem)) * 100);
-            }
-            const memBarClass = memPercent < 50 ? 'progress-low' : memPercent < 80 ? 'progress-mid' : 'progress-high';
 
             return `
 <div class="router-info-card">
@@ -660,22 +652,14 @@ ATURAN:
         <div class="card-icon">🖧</div>
         <div>
             <div class="card-title">${routerObj.name}</div>
-            <div class="card-subtitle"><span class="status-badge-inline badge-online"><span class="badge-dot"></span> Online</span> · ${arch}</div>
+            <div class="card-subtitle"><span class="status-badge-inline badge-online"><span class="badge-dot"></span> Online</span>${arch ? ' · ' + arch : ''}</div>
         </div>
     </div>
     <div class="metric-grid">
         <div class="metric-card metric-model"><div class="metric-label">Model</div><div class="metric-value">${boardName}</div></div>
         <div class="metric-card metric-version"><div class="metric-label">RouterOS</div><div class="metric-value">${version}</div></div>
-        <div class="metric-card metric-cpu">
-            <div class="metric-label">CPU Load</div>
-            <div class="metric-value ${cpuClass}">${cpuLoad}%</div>
-            <div class="progress-bar-container"><div class="progress-bar ${cpuBarClass}" style="width:${cpuLoad}%"></div></div>
-        </div>
-        <div class="metric-card metric-memory">
-            <div class="metric-label">Memory</div>
-            <div class="metric-value">${freeMem} MB free</div>
-            <div class="progress-bar-container"><div class="progress-bar ${memBarClass}" style="width:${memPercent}%"></div></div>
-        </div>
+        <div class="metric-card metric-cpu"><div class="metric-label">CPU</div><div class="metric-value ${cpuClass}">${cpuLoad}%</div></div>
+        <div class="metric-card metric-memory"><div class="metric-label">Memory</div><div class="metric-value">${freeMem} MB</div></div>
         <div class="metric-card metric-uptime"><div class="metric-label">Uptime</div><div class="metric-value">${uptime}</div></div>
     </div>
 </div>`;
