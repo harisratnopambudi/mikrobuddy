@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const callRouterAPI = async (endpoint, method = 'GET', data = null) => {
         if (!connectedRouter) return null;
         try {
-            const response = await fetch('/api/proxy', {
+            const response = await fetch(getWorkerEndpoint('/api/proxy'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
