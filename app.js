@@ -107,12 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const callRouterAPI = async (endpoint, method = 'GET', data = null) => {
         if (!connectedRouter) return null;
+        const proxyUrl = getWorkerEndpoint('/api/proxy');
+        let response;
         try {
-            const response = await fetch(getWorkerEndpoint('/api/proxy'), {
+            response = await fetch(proxyUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     target: connectedRouter.port ? `${connectedRouter.ip}:${connectedRouter.port}` : connectedRouter.ip,
                     username: connectedRouter.user,
@@ -122,16 +122,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: data
                 })
             });
-            if (!response.ok) {
-                const errData = await response.json();
-                const msg = errData.details ? `${errData.error} (${errData.details})` : (errData.error || 'API request failed');
-                throw new Error(msg);
-            }
-            return await response.json();
-        } catch (err) {
-            console.error('Router API Error:', err);
-            throw err;
+        } catch (networkErr) {
+            throw new Error('Network error: ' + (networkErr.message || String(networkErr)));
         }
+
+        let body;
+        try {
+            body = await response.json();
+        } catch (parseErr) {
+            const text = await response.text().catch(() => '');
+            throw new Error(`Non-JSON response (HTTP ${response.status}): ${text.substring(0, 200)}`);
+        }
+
+        if (!response.ok) {
+            const msg = body.details ? `${body.error} (${body.details})` : (body.error || `HTTP ${response.status}`);
+            throw new Error(msg);
+        }
+
+        return body;
     };
 
     const updateModeSelection = (mode) => {
