@@ -631,7 +631,7 @@ ATURAN:
 4. Jika mode DIAGNOSA: analisis singkat + rekomendasi konkret.
 5. Jika mode EKSEKUSI: langsung berikan script, penjelasan minimal.`;
 
-        // Build router info card HTML from live data (programmatic, not from AI)
+        // Build router info summary as a clean text block instead of a card grid
         const buildRouterCard = (routerObj, resourceData) => {
             if (!routerObj || !resourceData) return '';
             const res = Array.isArray(resourceData) ? resourceData[0] : resourceData;
@@ -644,25 +644,11 @@ ATURAN:
             const uptime = res.uptime || '-';
             const arch = res['architecture-name'] || res.architecture || '';
 
-            const cpuClass = cpuLoad < 30 ? 'text-success' : cpuLoad < 70 ? 'text-warning' : 'text-danger';
-
             return `
-<div class="router-info-card">
-    <div class="card-header">
-        <div class="card-icon">🖧</div>
-        <div>
-            <div class="card-title">${routerObj.name}</div>
-            <div class="card-subtitle"><span class="status-badge-inline badge-online"><span class="badge-dot"></span> Online</span>${arch ? ' · ' + arch : ''}</div>
-        </div>
-    </div>
-    <div class="metric-grid">
-        <div class="metric-card metric-model"><div class="metric-label">Model</div><div class="metric-value">${boardName}</div></div>
-        <div class="metric-card metric-version"><div class="metric-label">RouterOS</div><div class="metric-value">${version}</div></div>
-        <div class="metric-card metric-cpu"><div class="metric-label">CPU</div><div class="metric-value ${cpuClass}">${cpuLoad}%</div></div>
-        <div class="metric-card metric-memory"><div class="metric-label">Memory</div><div class="metric-value">${freeMem} MB</div></div>
-        <div class="metric-card metric-uptime"><div class="metric-label">Uptime</div><div class="metric-value">${uptime}</div></div>
-    </div>
-</div>`;
+<blockquote>
+<strong>🖧 ${routerObj.name} (Online)</strong><br>
+Model: <code>${boardName}</code> (${arch}) · RouterOS: <code>v${version}</code> · CPU: <code>${cpuLoad}%</code> · RAM Free: <code>${freeMem} MB</code> · Uptime: <code>${uptime}</code>
+</blockquote>`;
         };
 
         // 4. Query the official Gemini API directly
