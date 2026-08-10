@@ -335,6 +335,153 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // Run Script endpoint to parse and execute RouterOS CLI commands
+    if (req.url.startsWith('/api/run-script')) {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk;
+        });
+
+        req.on('end', async () => {
+            try {
+                const payload = JSON.parse(body || '{}');
+                const targetUrl = payload.target;
+                const username = payload.username;
+                const password = payload.password;
+                const script = payload.script || '';
+
+                if (!targetUrl || !script) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing target or script' }));
+                    return;
+                }
+
+                console.log(`Executing script on MikroTik target: ${targetUrl}`);
+
+                // Simple CLI line parser helper
+                const parseRouterOSCLI = (cliLine) => {
+                    const line = cliLine.trim();
+                    if (!line) return null;
+
+                    const words = [];
+                    let currentWord = '';
+                    let inQuotes = false;
+                    let quoteChar = '';
+
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if ((char === '"' || char === "'") && (i === 0 || line[i-1] !== '\\')) {
+                            if (inQuotes && char === quoteChar) {
+                                inQuotes = false;
+                            } else if (!inQuotes) {
+                                inQuotes = true;
+                                quoteChar = char;
+                            }
+                            currentWord += char;
+                        } else if (char === ' ' && !inQuotes) {
+                            if (currentWord) {
+                                words.push(currentWord);
+                                currentWord = '';
+                            }
+                        } else {
+                            currentWord += char;
+                        }
+                    }
+                    if (currentWord) words.push(currentWord);
+
+                    if (words.length === 0) return null;
+
+                    const cmdParts = [];
+                    const argParts = [];
+
+                    for (const word of words) {
+                        if (word.includes('=') && !word.startsWith('/')) {
+                            argParts.push(word);
+                        } else {
+                            if (argParts.length > 0) {
+                                argParts.push(word);
+                            } else {
+                                cmdParts.push(word);
+                            }
+                        }
+                    }
+
+                    let command = cmdParts.join('/')
+                        .replace(/\/+/g, '/')
+                        .replace(/^\/?/, '/');
+
+                    const args = {};
+                    for (const arg of argParts) {
+                        const eqIdx = arg.indexOf('=');
+                        if (eqIdx !== -1) {
+                            const rawKey = arg.substring(0, eqIdx).trim();
+                            let rawVal = arg.substring(eqIdx + 1).trim();
+                            
+                            if ((rawVal.startsWith('"') && rawVal.endsWith('"')) || (rawVal.startsWith("'") && rawVal.endsWith("'"))) {
+                                rawVal = rawVal.substring(1, rawVal.length - 1);
+                            }
+                            rawVal = rawVal.replace(/\\"/g, '"').replace(/\\'/g, "'");
+                            
+                            if (rawKey) {
+                                args[rawKey] = rawVal;
+                            }
+                        }
+                    }
+
+                    return { command, args };
+                };
+
+                const lines = script.split('\n')
+                    .map(l => l.trim())
+                    .filter(l => l && !l.startsWith('#') && !l.startsWith('//'));
+
+                const results = [];
+                const hostPort = targetUrl.replace(/^http(s)?:\/\//, '').split(':');
+                const host = hostPort[0];
+                const port = parseInt(hostPort[1] || '8728');
+
+                let currentContext = ''; // Tracks command submenu context (e.g. "/ip hotspot user")
+
+                for (const line of lines) {
+                    let targetLine = line;
+                    
+                    if (line.startsWith('/')) {
+                        const parsed = parseRouterOSCLI(line);
+                        if (parsed) {
+                            const isAction = parsed.command.match(/\/(print|add|set|remove|disable|enable|move|export|getall)$/);
+                            if (!isAction) {
+                                currentContext = parsed.command;
+                                continue; 
+                            } else {
+                                currentContext = '';
+                            }
+                        }
+                    } else if (currentContext) {
+                        targetLine = `${currentContext} ${line}`;
+                    }
+
+                    const parsed = parseRouterOSCLI(targetLine);
+                    if (parsed) {
+                        try {
+                            const resData = await queryRouterOSAPI(host, port, username, password, parsed.command, parsed.args);
+                            results.push({ line: targetLine, success: true, response: resData });
+                        } catch (err) {
+                            results.push({ line: targetLine, success: false, error: err.message });
+                        }
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, results }));
+
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to execute script', details: err.message }));
+            }
+        });
+        return;
+    }
+
     // Chat endpoint to 9router AI API
     if (req.url.startsWith('/api/chat')) {
         let body = '';
