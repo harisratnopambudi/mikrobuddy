@@ -239,12 +239,19 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // Test connection using system resource
             const resource = await callRouterAPI('/system/resource');
-            const boardName = (resource && (resource.board || resource['board-name'])) || 'MikroTik';
-            const version = (resource && (resource.version || resource['version'])) || '';
-            appendSystemNotification(`Berhasil terhubung ke router: ${routerName} (${boardName} v${version})`);
+            // RouterOS API returns an array of objects - get the first element
+            const res = Array.isArray(resource) ? resource[0] : resource;
+            if (res && (res['board-name'] || res.board || res.version)) {
+                const boardName = res['board-name'] || res.board || 'MikroTik';
+                const version = res.version || '';
+                appendSystemNotification(`✅ Berhasil terhubung ke router: ${routerName} (${boardName} v${version})`);
+            } else {
+                appendSystemNotification(`✅ Berhasil terhubung ke router: ${routerName} (${routerIp})`);
+            }
         } catch (err) {
+            const errMsg = (err && err.message) ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
             console.error('Real API failed, fallback to simulation:', err);
-            appendSystemNotification(`Gagal koneksi: ${err.message}. Hubungkan router: ${routerName} (${routerIp}) [Mode Simulasi/Offline]`);
+            appendSystemNotification(`⚠️ Gagal koneksi real-time: ${errMsg}. Router: ${routerName} (${routerIp}) [Mode Simulasi/Offline]`);
         }
 
         saveRouterToStorage();
