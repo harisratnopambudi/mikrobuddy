@@ -36,6 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentChatId = null;
 
     // --- Helper Functions ---
+    const WORKER_BASE_URL = 'https://mikro-buddy.harisratnopambudi.workers.dev';
+
     const getStoragePrefix = () => {
         const savedAuth = localStorage.getItem('auth_user');
         if (savedAuth) {
@@ -45,6 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {}
         }
         return 'guest';
+    };
+
+    const getWorkerEndpoint = (path) => {
+        const base = localStorage.getItem('nine_router_worker_url') || WORKER_BASE_URL;
+        return base.replace(/\/$/, '') + path;
     };
 
     const saveChatsToStorage = () => {
@@ -236,8 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const version = (resource && (resource.version || resource['version'])) || '';
             appendSystemNotification(`Berhasil terhubung ke router: ${routerName} (${boardName} v${version})`);
         } catch (err) {
-            console.warn('Real API failed, fallback to simulation:', err);
-            appendSystemNotification(`Berhasil terhubung ke router: ${routerName} (${routerIp}) [Mode Simulasi/Offline]`);
+            console.error('Real API failed, fallback to simulation:', err);
+            appendSystemNotification(`Gagal koneksi: ${err.message}. Hubungkan router: ${routerName} (${routerIp}) [Mode Simulasi/Offline]`);
         }
 
         saveRouterToStorage();
@@ -725,12 +732,8 @@ Aturan Khusus:
         });
     });
 
-    // Helper to resolve serverless endpoints via Cloudflare Worker
-    const getWorkerEndpoint = (path) => {
-        const workerUrl = localStorage.getItem('nine_router_worker_url') || 'https://mikro-buddy.harisratnopambudi.workers.dev';
-        const cleanWorkerUrl = workerUrl.replace(/\/$/, '');
-        return `${cleanWorkerUrl}${path}`;
-    };
+
+
 
     // Google Sign-In Integration for Gmail Login
     window.handleCredentialResponse = async (response) => {
