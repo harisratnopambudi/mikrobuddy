@@ -600,7 +600,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch (err) {
-                routerContext += `Router is connected but failed to fetch live details: ${err.message || JSON.stringify(err)}\n\n`;
+                const errDetail = (err && err.message) ? err.message : (typeof err === 'string' ? err : JSON.stringify(err));
+                routerContext += `Router is connected but failed to fetch live details: ${errDetail}\n\n`;
             }
         }
 
