@@ -562,14 +562,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (router) {
             try {
                 // Fetch general resource info
-                const resource = await callRouterAPI('/system/resource');
+                const resourceRaw = await callRouterAPI('/system/resource');
+                const resource = Array.isArray(resourceRaw) ? resourceRaw[0] : resourceRaw;
                 if (resource) {
                     routerContext += `Connected Router Info:\n`;
                     routerContext += `- Name: ${router.name}\n`;
-                    routerContext += `- Board Model: ${resource.board || resource['board-name'] || 'MikroTik'}\n`;
+                    routerContext += `- Board Model: ${resource['board-name'] || resource.board || 'MikroTik'}\n`;
                     routerContext += `- RouterOS Version: ${resource.version || 'unknown'}\n`;
                     routerContext += `- CPU Load: ${resource['cpu-load'] || '0'}%\n`;
-                    routerContext += `- Free Memory: ${(resource['free-memory'] / 1024 / 1024).toFixed(1)} MB\n`;
+                    const freeMem = resource['free-memory'] ? (parseInt(resource['free-memory']) / 1024 / 1024).toFixed(1) : '?';
+                    routerContext += `- Free Memory: ${freeMem} MB\n`;
                     routerContext += `- Uptime: ${resource.uptime || ''}\n\n`;
                 }
 
@@ -598,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch (err) {
-                routerContext += `Router is connected but failed to fetch live details: ${err.message}\n\n`;
+                routerContext += `Router is connected but failed to fetch live details: ${err.message || JSON.stringify(err)}\n\n`;
             }
         }
 
