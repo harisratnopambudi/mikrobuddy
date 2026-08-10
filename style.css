@@ -828,6 +828,7 @@ button, input, select {
 
 .chat-input-container input {
     flex: 1;
+    min-width: 0;
     font-size: 0.95rem;
     color: var(--text-primary);
     padding: 10px 0;
