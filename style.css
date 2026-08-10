@@ -1297,6 +1297,60 @@ button, input, select {
     #active-router-name {
         display: none; /* Hide router name text, just show indicator icon on small mobile */
     }
+
+    /* Header improvements */
+    .main-header {
+        padding: 0 12px;
+    }
+    
+    .header-status {
+        gap: 6px;
+    }
+
+    .status-badge {
+        display: none !important; /* Hide online badge on mobile to free up space */
+    }
+
+    .upgrade-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+
+    /* Alert Banner wrapper */
+    .alert-banner {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 10px 16px;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .alert-content {
+        justify-content: center;
+        font-size: 0.8rem;
+    }
+
+    .alert-action-btn {
+        align-self: center;
+        width: 100%;
+        text-align: center;
+    }
+    
+    /* Compact input bar on mobile */
+    .chat-input-container {
+        padding: 10px 12px;
+    }
+    
+    .input-wrapper {
+        padding: 6px;
+        gap: 8px;
+    }
+
+    /* Message content responsive padding */
+    .message-content {
+        max-width: 90%;
+        padding: 8px 12px;
+    }
 }
 
 /* Thinking Indicator Styles */
