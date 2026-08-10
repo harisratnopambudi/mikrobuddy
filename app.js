@@ -523,23 +523,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const contentContainer = assistantBubble.querySelector('.message-content');
 
         // Check if there's a blockquote header (router info)
-        const blockquoteMatch = responseText.match(/^([\s\S]*?<\/blockquote>)([\s\S]*)$/);
+        const hasBlockquote = responseText.includes('<blockquote>');
         
-        if (blockquoteMatch) {
-            const blockquoteHtml = blockquoteMatch[1];
-            const aiResponseText = blockquoteMatch[2];
-            
-            // Set the blockquote instantly
-            contentContainer.innerHTML = blockquoteHtml;
-            
-            // Create a wrapper element for the rest of the text to be typed
-            const textWrapper = document.createElement('div');
-            contentContainer.appendChild(textWrapper);
-            
-            typeWriter(textWrapper, aiResponseText, 8, () => {
-                activeChat.messages.push({ sender: 'assistant', content: responseText });
-                saveChatsToStorage();
-            });
+        if (hasBlockquote) {
+            // Render instantly to prevent typewriter layout formatting differences
+            contentContainer.innerHTML = responseText;
+            activeChat.messages.push({ sender: 'assistant', content: responseText });
+            saveChatsToStorage();
         } else {
             typeWriter(contentContainer, responseText, 8, () => {
                 activeChat.messages.push({ sender: 'assistant', content: responseText });
