@@ -218,8 +218,12 @@ const server = http.createServer((req, res) => {
 
                 console.log(`Proxying MikroTik request to: ${targetUrl}, endpoint: ${endpoint}, user: ${username}`);
 
-                // Check if target is REST API (starts with http or uses port 80/443)
-                const isRest = targetUrl.startsWith('http') || targetUrl.includes(':80') || targetUrl.includes(':443');
+                // Check if target is REST API based on port number
+                const hostPort = targetUrl.replace(/^http(s)?:\/\//, '').split(':');
+                const host = hostPort[0];
+                const port = hostPort[1] ? parseInt(hostPort[1]) : 8728;
+                const restPorts = [80, 443];
+                const isRest = targetUrl.startsWith('http') || restPorts.includes(port);
 
                 if (isRest) {
                     // HTTP REST API proxy
@@ -264,9 +268,7 @@ const server = http.createServer((req, res) => {
                     proxyReq.end();
                 } else {
                     // Raw TCP RouterOS API proxy (e.g. port 1206 or 8728)
-                    const hostPort = targetUrl.replace(/^http(s)?:\/\//, '').split(':');
-                    const host = hostPort[0];
-                    const port = parseInt(hostPort[1] || '8728');
+                    // host and port are already parsed above
 
                     // Map REST endpoints to RouterOS API commands
                     let command = '';
@@ -300,8 +302,13 @@ const server = http.createServer((req, res) => {
                             command = '/ip/firewall/mangle/print';
                         }
                     } else {
-                        // Generic command fallback
-                        command = endpoint.replace(/^\//, '/').replace(/\/$/, '');
+                        // Generic command fallback: append /print if no action suffix
+                        const cleanCmd = endpoint.replace(/^\//, '/').replace(/\/$/, '');
+                        if (!cleanCmd.match(/\/(print|add|set|remove|disable|enable|move|export|getall)$/)) {
+                            command = cleanCmd + '/print';
+                        } else {
+                            command = cleanCmd;
+                        }
                     }
 
                     queryRouterOSAPI(host, port, username, password, command, args)
