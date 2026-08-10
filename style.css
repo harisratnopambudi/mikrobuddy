@@ -1516,22 +1516,7 @@ button, input, select {
     transform: translateY(-1px);
 }
 
-.message-content .metric-card::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-}
 
-.message-content .metric-card.metric-cpu::after { background: linear-gradient(90deg, #6366f1, #818cf8); }
-.message-content .metric-card.metric-memory::after { background: linear-gradient(90deg, #10b981, #34d399); }
-.message-content .metric-card.metric-uptime::after { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.message-content .metric-card.metric-version::after { background: linear-gradient(90deg, #ec4899, #f472b6); }
-.message-content .metric-card.metric-model::after { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
-.message-content .metric-card.metric-default::after { background: linear-gradient(90deg, #64748b, #94a3b8); }
 
 .message-content .metric-card .metric-label {
     font-size: 0.72rem;
