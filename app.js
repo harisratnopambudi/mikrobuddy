@@ -405,6 +405,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             
                             const data = await res.json();
                             if (res.ok && data.success) {
+                                // Check if any individual line failed
+                                const failedLine = (data.results || []).find(r => !r.success);
+                                if (failedLine) {
+                                    throw new Error(`Baris "${failedLine.line}" gagal: ${failedLine.error}`);
+                                }
+                                
                                 runBtn.className = 'btn-run-script success';
                                 runBtn.innerHTML = '<i data-lucide="check-circle" style="width:12px; height:12px;"></i> Berhasil!';
                                 appendSystemNotification(`✅ Script berhasil dijalankan ke router ${connectedRouter.name}.`);
