@@ -42,6 +42,7 @@ body {
     color: var(--text-primary);
     overflow: hidden;
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
     -webkit-font-smoothing: antialiased;
 }
@@ -58,6 +59,7 @@ button, input, select {
 .app-container {
     display: flex;
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
     position: relative;
 }
@@ -349,9 +351,11 @@ button, input, select {
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    background-color: rgba(10, 11, 13, 0.5);
+    background-color: rgba(10, 11, 13, 0.85);
     backdrop-filter: blur(12px);
-    z-index: 10;
+    z-index: 99;
+    position: sticky;
+    top: 0;
 }
 
 .header-status {
@@ -437,9 +441,9 @@ button, input, select {
     box-shadow: 0 6px 16px rgba(88, 101, 242, 0.35);
 }
 
-/* Alert Banner */
 .alert-banner {
-    background-color: rgba(88, 101, 242, 0.08);
+    background-color: rgba(18, 19, 24, 0.85);
+    backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(88, 101, 242, 0.15);
     padding: 12px 24px;
     display: flex;
@@ -447,6 +451,9 @@ button, input, select {
     justify-content: space-between;
     gap: 16px;
     font-size: 0.9rem;
+    position: sticky;
+    top: 64px;
+    z-index: 98;
 }
 
 .alert-banner.hidden {
