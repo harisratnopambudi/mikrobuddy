@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MikroBuddy AI - Asisten Jaringan MikroTik</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Marked.js Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Google Identity Services (GSI) for Gmail Login -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-wrapper" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <div class="logo">
+                        <span class="logo-icon">M</span>
+                        <span class="logo-text">MikroBuddy AI</span>
+                    </div>
+                    <button class="sidebar-close-btn" id="btn-close-sidebar" style="display:none; color:var(--text-secondary); cursor:pointer;">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" id="btn-new-chat">
+                    <i data-lucide="plus"></i>
+                    <span>Obrolan Baru</span>
+                    <span class="shortcut">Ctrl+K</span>
+                </button>
+                <button class="nav-btn" id="btn-add-router-sidebar">
+                    <i data-lucide="router"></i>
+                    <span>Tambah Router</span>
+                </button>
+                <button class="nav-btn" id="btn-telegram">
+                    <i data-lucide="send"></i>
+                    <span>Notifikasi Telegram</span>
+                </button>
+                <button class="nav-btn" id="btn-voucher">
+                    <i data-lucide="ticket"></i>
+                    <span>Voucher</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-search">
+                <div class="search-box">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="chat-search" placeholder="Cari obrolan...">
+                </div>
+            </div>
+
+            <div class="sidebar-history">
+                <div class="history-title">RIWAYAT</div>
+                <div class="history-list" id="history-list">
+                    <div class="empty-history">Belum ada obrolan</div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile" id="user-profile-card">
+                    <div class="avatar" id="user-avatar-placeholder">?</div>
+                    <img class="avatar hidden" id="user-avatar-img" src="" alt="Avatar" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">
+                    <div class="user-info">
+                        <div class="user-name" id="user-profile-name">Belum Login</div>
+                        <div class="user-email" id="user-profile-email">Akses terbatas (Free)</div>
+                    </div>
+                </div>
+                <div id="google-login-container" style="margin-top: 10px; margin-bottom: 5px; width: 100%; display: flex; justify-content: center;"></div>
+                
+                <button class="settings-btn" id="btn-settings">
+                    <i data-lucide="settings"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-status">
+                    <button class="menu-toggle-btn" id="btn-toggle-sidebar" style="display:none; color:var(--text-secondary); cursor:pointer; margin-right:12px;">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <span class="chat-title">MikroBuddy AI</span>
+                    <span class="status-badge"><span class="status-dot"></span> Online</span>
+                </div>
+                <div class="header-actions">
+                    <div class="active-router-badge hidden" id="active-router-indicator">
+                        <i data-lucide="cpu"></i>
+                        <span id="active-router-name">MikroTik Router</span>
+                        <button class="disconnect-router-btn" id="btn-disconnect-router" title="Putuskan Router">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <button class="upgrade-btn" id="btn-upgrade-header">Langganan</button>
+                </div>
+            </header>
+
+            <!-- Alert Banner -->
+            <div class="alert-banner" id="subscription-banner">
+                <div class="alert-content">
+                    <i data-lucide="info"></i>
+                    <span>Langganan belum aktif. Berlangganan untuk lanjut chat secara penuh.</span>
+                </div>
+                <button class="alert-action-btn" id="btn-view-packages">Lihat Paket</button>
+            </div>
+
+            <!-- Chat Viewport -->
+            <div class="chat-viewport">
+                <!-- Welcome/Empty State Screen -->
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-logo">M</div>
+                    <h1>Asisten jaringan MikroTik</h1>
+                    <p>Konfigurasi, monitoring, dan troubleshoot jaringan MikroTik Anda dengan AI secara otomatis.</p>
+                    
+                    <!-- Suggestions grid -->
+                    <div class="suggestions-grid">
+                        <button class="suggestion-card" data-query="Cara setting pisah trafik game biar ping stabil">
+                            <span>Cara setting pisah trafik game biar ping stabil</span>
+                        </button>
+                        <button class="suggestion-card" data-query="Cara setting load balance 2 ISP">
+                            <span>Cara setting load balance 2 ISP</span>
+                        </button>
+                        <button class="suggestion-card" data-query="Internet pelanggan sering putus, cek dari mana?">
+                            <span>Internet pelanggan sering putus, cek dari mana?</span>
+                        </button>
+                    </div>
+
+                    <div class="disclaimer-text">
+                        <i data-lucide="shield-alert"></i>
+                        <span>Mode Diagnosa membaca seluruh router (read-only) dan mencocokkan ke knowledge base.</span>
+                    </div>
+                </div>
+
+                <!-- Active Chat Messages -->
+                <div class="chat-messages-container hidden" id="chat-messages">
+                    <!-- Dynamic chat messages go here -->
+                </div>
+            </div>
+
+            <!-- Input Container -->
+            <div class="chat-input-container">
+                <div class="input-wrapper">
+                    <!-- Mode Switcher -->
+                    <div class="mode-select-dropdown">
+                        <button class="mode-select-btn" id="btn-mode-select">
+                            <i data-lucide="zap" id="mode-icon"></i>
+                            <span id="mode-text">Biasa</span>
+                            <i data-lucide="chevron-down" class="chevron"></i>
+                        </button>
+                        <div class="dropdown-menu" id="mode-dropdown-menu">
+                            <div class="dropdown-item active" data-mode="biasa">
+                                <i data-lucide="zap"></i>
+                                <div>
+                                    <div class="item-title">Biasa (Konsultasi)</div>
+                                    <div class="item-desc">Tanya jawab umum tentang konsep jaringan dan script MikroTik.</div>
+                                </div>
+                            </div>
+                            <div class="dropdown-item" data-mode="diagnosa">
+                                <i data-lucide="shield-alert"></i>
+                                <div>
+                                    <div class="item-title">Diagnosa (Read-Only)</div>
+                                    <div class="item-desc">Membaca status router dan mendeteksi anomali/eror.</div>
+                                </div>
+                            </div>
+                            <div class="dropdown-item" data-mode="eksekusi">
+                                <i data-lucide="terminal"></i>
+                                <div>
+                                    <div class="item-title">Eksekusi (Write)</div>
+                                    <div class="item-desc">Membuat script & langsung menerapkan pengaturan di Winbox.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Box -->
+                    <input type="text" id="chat-input" placeholder="Tanya sesuatu tentang MikroTik...">
+
+                    <!-- Send Action -->
+                    <button class="send-btn" id="btn-send-message">
+                        <i data-lucide="arrow-up"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Add Router Modal -->
+    <div class="modal-backdrop hidden" id="modal-add-router">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Hubungkan MikroTik Router</h3>
+                <button class="close-modal-btn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-subtitle">Gunakan kredensial Winbox / API port (default: 8728 atau 8729 untuk SSL) agar asisten AI dapat berinteraksi dengan router.</p>
+                <form id="add-router-form">
+                    <div class="form-group">
+                        <label for="router-name">Nama Router / Identitas</label>
+                        <input type="text" id="router-name" placeholder="Router Kantor / Mikrotik RB750" value="AshrafHotspot" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="router-ip">IP Address / DNS Host</label>
+                            <input type="text" id="router-ip" placeholder="192.168.88.1 atau id-3.mikrobuddy.net" value="id1.mikhmon.web.id" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="router-port">Port (API)</label>
+                            <input type="number" id="router-port" value="1206" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="router-user">Username</label>
+                            <input type="text" id="router-user" placeholder="admin" value="admin" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="router-pass">Password</label>
+                            <input type="password" id="router-pass" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="router-use-ssl">
+                        <label for="router-use-ssl">Gunakan Koneksi Aman (SSL / HTTPS API)</label>
+                    </div>
+                    <button type="submit" class="submit-btn">Hubungkan Router</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voucher / Subscription Modal -->
+    <div class="modal-backdrop hidden" id="modal-voucher">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Aktivasi Fitur PRO</h3>
+                <button class="close-modal-btn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="subscription-plans">
+                    <div class="plan-card active">
+                        <div class="plan-badge">POPULER</div>
+                        <h4>Paket Pro Bulanan</h4>
+                        <div class="plan-price">Rp 49.000<span>/bulan</span></div>
+                        <ul>
+                            <li><i data-lucide="check"></i> Unlimited Chat AI & Diagnosa</li>
+                            <li><i data-lucide="check"></i> Kelola hingga 5 Router MikroTik</li>
+                            <li><i data-lucide="check"></i> Integrasi Notifikasi Telegram</li>
+                            <li><i data-lucide="check"></i> Auto Backup Konfigurasi</li>
+                        </ul>
+                        <a href="https://lynk.id/harisratnopambudi/yjz3xjrq773j" target="_blank" class="submit-btn" style="display:block; text-align:center; text-decoration:none; line-height:40px; margin-top:15px; font-weight:600;">
+                            Beli Paket Pro di Lynk.id
+                        </a>
+                    </div>
+                </div>
+                <div class="divider" style="margin: 20px 0;"><span>CARA AKTIVASI</span></div>
+                <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                    <ol style="margin-left: 15px; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">Lakukan pembelian paket PRO di halaman <strong>Lynk.id</strong> dengan mencantumkan email Gmail aktif Anda.</li>
+                        <li style="margin-bottom: 8px;">Setelah transaksi sukses, buka kembali aplikasi ini dan klik tombol <strong>"Sign in with Google"</strong> di pojok kiri bawah.</li>
+                        <li>Gunakan akun Gmail yang sama saat membeli di Lynk.id, dan fitur PRO Anda akan aktif secara otomatis!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Telegram Settings Modal -->
+    <div class="modal-backdrop hidden" id="modal-telegram">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Integrasi Notifikasi Telegram</h3>
+                <button class="close-modal-btn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-subtitle">Dapatkan notifikasi jika server drop, trafik melonjak, atau ada percobaan login mencurigakan pada MikroTik Anda.</p>
+                <div class="telegram-steps">
+                    <div class="step">
+                        <div class="step-num">1</div>
+                        <div>Mulai percakapan dengan bot Telegram kami <a href="https://t.me/MikroBuddyAlertBot" target="_blank">@MikroBuddyAlertBot</a></div>
+                    </div>
+                    <div class="step">
+                        <div class="step-num">2</div>
+                        <div>Kirim perintah <code>/start</code> dan dapatkan ID Telegram Anda.</div>
+                    </div>
+                </div>
+                <form id="telegram-form" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label for="telegram-chat-id">Chat ID Telegram</label>
+                        <input type="text" id="telegram-chat-id" placeholder="Contoh: 123456789" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Simpan & Uji Coba Notifikasi</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-backdrop hidden" id="modal-settings">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Pengaturan Asisten</h3>
+                <button class="close-modal-btn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+
+
+                <div class="form-group">
+                    <label for="settings-language">Bahasa Asisten</label>
+                    <select id="settings-language">
+                        <option value="id">Bahasa Indonesia</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="settings-auto-backup" checked>
+                    <label for="settings-auto-backup">Cadangkan konfigurasi RouterOS otomatis setiap hari</label>
+                </div>
+                <button class="submit-btn" id="btn-save-settings">Simpan Pengaturan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Overlay Loader -->
+    <div class="connection-overlay hidden" id="connection-loader">
+        <div class="loader-content">
+            <div class="spinner"></div>
+            <h4 id="loader-title">Menghubungkan ke Router...</h4>
+            <p id="loader-desc">Membaca API port & menguji kredensial Winbox.</p>
+        </div>
+    </div>
+
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

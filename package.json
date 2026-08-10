@@ -1,0 +1,17 @@
+{
+  "name": "ai-mikrotik",
+  "version": "1.0.0",
+  "description": "MikroBuddy AI Chatbot Assistant for MikroTik Winbox",
+  "main": "index.html",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "mikrotik",
+    "winbox",
+    "ai",
+    "chatbot"
+  ],
+  "author": "Antigravity",
+  "license": "ISC"
+}
